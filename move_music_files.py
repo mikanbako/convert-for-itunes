@@ -14,15 +14,15 @@ import sys
 import filename_sanitizer
 import mutagen
 
+OGG_VORBIS_MIME_TYPE = 'audio/vorbis'
+MP3_MIME_TYPE = 'audio/mp3'
+
 DISC_TRACK_NUMBER_PATTERN = re.compile(r'^(\d+)(?:/\d*$)?')
 
-# TODO MP3
+UNKNOWN_ALBUM = 'Unknown album'
+UNKNOWN_ARTIST = 'Unknown atrist'
 
-
-class MusicFile:
-    def __init__(self, path):
-        self.path = path
-        self.file_type = mutagen.File(path)
+EXCLUDING_FILE_EXTENSIONS = ('.log', '.pdf', '.txt', '.jpg', '.png')
 
 
 class FileLoadingError(Exception):
@@ -36,10 +36,152 @@ class FileCopyingError(Exception):
         self.destination_path = destination_path
 
 
+class MusicInfo:
+    def __init__(self, file_type):
+        self.__file_type = file_type
+
+    @property
+    def file_type(self):
+        return self.__file_type
+
+    def get_album_artist(self):
+        raise NotImplementedError()
+
+    def get_album(self):
+        raise NotImplementedError()
+
+    def get_disc_number(self):
+        raise NotImplementedError()
+
+    def get_track_number(self):
+        raise NotImplementedError()
+
+    def get_track_name(self):
+        raise NotImplementedError()
+
+
+class OggVorbisInfo(MusicInfo):
+    def __init__(self, file_type):
+        MusicInfo.__init__(self, file_type)
+
+    def get_album_artist(self):
+        if 'album artist' in self.file_type:
+            return self.file_type['album artist'][0]
+        elif 'artist' in self.file_type:
+            return self.file_type['artist'][0]
+        else:
+            return None
+
+    def get_album(self):
+        return (self.file_type['album'][0] if 'album' in self.file_type
+                else None)
+
+    def get_disc_number(self):
+        if 'discnumber' not in self.file_type:
+            return None
+
+        match = DISC_TRACK_NUMBER_PATTERN.match(
+            self.file_type['discnumber'][0])
+
+        return match.group(1) if match else None
+
+    def get_track_number(self):
+        if 'tracknumber' not in self.file_type:
+            return None
+
+        match = DISC_TRACK_NUMBER_PATTERN.match(
+            self.file_type['tracknumber'][0])
+
+        return match.group(1) if match else None
+
+    def get_track_name(self):
+        return (self.file_type['title'][0] if 'title' in self.file_type
+                else None)
+
+
+class Mp3Info(MusicInfo):
+    def __init__(self, file_type):
+        MusicInfo.__init__(self, file_type)
+
+    def get_album_artist(self):
+        if 'TPE2' in self.file_type:
+            return self.file_type['TPE2'].text[0]
+        elif 'TXXX:ALBUMARTIST' in self.file_type:
+            return self.file_type['TXXX:ALBUMARTIST'].text[0]
+        elif 'TPE1' in self.file_type:
+            return self.file_type['TPE1'].text[0]
+        else:
+            return None
+
+    def get_album(self):
+        return (self.file_type['TALB'].text[0] if 'TALB' in self.file_type
+                else None)
+
+    def get_track_number(self):
+        if 'TRCK' not in self.file_type:
+            return None
+
+        match = DISC_TRACK_NUMBER_PATTERN.match(self.file_type['TRCK'].text[0])
+
+        return match.group(1) if match else None
+
+    def get_disc_number(self):
+        if 'TPOS' not in self.file_type:
+            return None
+
+        match = DISC_TRACK_NUMBER_PATTERN.match(self.file_type['TPOS'].text[0])
+
+        return match.group(1) if match else None
+
+    def get_track_name(self):
+        return (self.file_type['TIT2'].text[0] if 'TIT2' in self.file_type
+                else None)
+
+
+MIME_TYPE_TO_MUSIC_INFO = {
+    OGG_VORBIS_MIME_TYPE: OggVorbisInfo,
+    MP3_MIME_TYPE: Mp3Info,
+}
+
+
+class MusicFile:
+    def __init__(self, path):
+        self.path = path
+
+        file_type = mutagen.File(path)
+
+        if not file_type:
+            raise FileLoadingError('Unsupported file: {}'.format(path))
+
+        mime_type = self.get_mime_type(file_type)
+
+        if mime_type not in MIME_TYPE_TO_MUSIC_INFO:
+            raise FileLoadingError('Unsupported format: {}'.format(file_type))
+
+        self.info = MIME_TYPE_TO_MUSIC_INFO[mime_type](file_type)
+
+    @classmethod
+    def get_mime_type(cls, file_type):
+        for mime_type in MIME_TYPE_TO_MUSIC_INFO:
+            if mime_type in file_type.mime:
+                return mime_type
+
+        return None
+
+
+def is_excluding_file(path):
+    extension = os.path.splitext(path)[1].lower()
+
+    return extension in EXCLUDING_FILE_EXTENSIONS
+
+
 def load_files(music_paths):
     music_files = []
 
     for path in music_paths:
+        if is_excluding_file(path):
+            continue
+
         try:
             music_files.append(MusicFile(path))
         except mutagen.MutagenError:
@@ -48,33 +190,10 @@ def load_files(music_paths):
     return music_files
 
 
-def get_album_artist(file_type):
-    if 'album artist' in file_type:
-        return file_type['album artist'][0]
-    elif 'artist' in file_type:
-        return file_type['artist'][0]
-    else:
-        return 'Unknown artist'
-
-
-def get_album(file_type):
-    return file_type['album'][0] if 'album' in file_type else 'Unknown album'
-
-
-def get_disc_track_number(file_type, field_name):
-    match = DISC_TRACK_NUMBER_PATTERN.match(file_type[field_name][0])
-
-    return match.group(1) if match else None
-
-
-def get_track_name(file_type):
-    return file_type['title'][0] if 'title' in file_type else 'No title'
-
-
 def get_new_filename(music_file):
-    disk_number = get_disc_track_number(music_file.file_type, 'discnumber')
-    track_number = get_disc_track_number(music_file.file_type, 'tracknumber')
-    track_name = get_track_name(music_file.file_type)
+    disk_number = music_file.info.get_disc_number()
+    track_number = music_file.info.get_track_number()
+    track_name = music_file.info.get_track_name()
     extension = os.path.splitext(music_file.path)[1]
 
     filename = ''
@@ -84,16 +203,22 @@ def get_new_filename(music_file):
     elif disk_number:
         filename += '{}-x. '.format(disk_number)
     elif track_number:
-        filename += '{}. '.format(track_name)
+        filename += '{}. '.format(track_number)
 
-    filename += '{}{}'.format(track_name, extension)
+    if track_name:
+        filename += '{}{}'.format(track_name, extension)
+    else:
+        filename += music_file.path
 
     return filename_sanitizer.sanitize_path_fragment(filename)
 
 
 def get_output_path(music_file, output_directory):
-    album_artist = get_album_artist(music_file.file_type)
-    album = get_album(music_file.file_type)
+    album_artist = music_file.info.get_album_artist()
+    album = music_file.info.get_album()
+
+    album_artist = album_artist if album_artist is not None else UNKNOWN_ARTIST
+    album = album if album is not None else UNKNOWN_ALBUM
 
     output_path = (
         pathlib.Path(output_directory) /
@@ -130,7 +255,6 @@ def move_music_files(all_music_files, is_dry_run_mode, output_directory):
 
     for path in (music_file.path for music_file in all_music_files):
         os.remove(path)
-
 
 
 def main():

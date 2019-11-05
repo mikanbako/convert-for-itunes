@@ -23,6 +23,8 @@ MP3_MIME_TYPE = 'audio/mp3'
 
 SUPPORTED_MIME_TYPES = (OGG_VORBIS_MIME_TYPE, MP3_MIME_TYPE)
 
+EXCLUDING_FILE_EXTENSIONS = ('.log', '.pdf', '.txt', '.jpg', '.png')
+
 
 class ConversionFailedException(Exception):
     def __init__(self, cause):
@@ -45,13 +47,13 @@ def get_mp3_file_path(ogg_file_path, output_directory):
 
 
 def get_mime_type(source_file):
-    ogg_file = mutagen.File(source_file)
+    file_type = mutagen.File(source_file)
 
-    if not ogg_file:
+    if not file_type:
         return None
 
     for mime_type in SUPPORTED_MIME_TYPES:
-        if mime_type in ogg_file.mime:
+        if mime_type in file_type.mime:
             return mime_type
 
     return None
@@ -61,20 +63,21 @@ def get_all_mime_type(all_source_files):
     assert(all_source_files)
 
     is_first = True
+    mime_type = None
 
     for source_file in all_source_files:
         current_mime_type = get_mime_type(source_file)
 
         if not current_mime_type:
             raise ConversionFailedException(
-                'The format of {} is unsupported.' % (source_file))
+                'The format of {} is unsupported.'.format(source_file))
 
         if is_first:
             mime_type = current_mime_type
             is_first = False
         elif mime_type != current_mime_type:
             raise ConversionFailedException(
-                'The format of {} is different.' % (source_file))
+                'The format of {} is different.'.format(source_file))
 
     return mime_type
 
@@ -83,14 +86,24 @@ def calculate_ogg_vorbis_gain(all_source_files):
     vorbisgain = shutil.which('vorbisgain')
 
     try:
-        subprocess.run(['vorbisgain', '-a'] + all_source_files, check=True)
+        subprocess.run([vorbisgain, '-a'] + all_source_files, check=True)
     except subprocess.CalledProcessError as e:
         raise ConversionFailedException('Calculating gain is failed.')
 
 
-# TODO MP3
+def calculate_mp3_gain(all_source_files):
+    aacgain = shutil.which('aacgain')
+
+    try:
+        subprocess.run([aacgain, '-r', '-a'] + all_source_files, check=True)
+    except subprocess.CalledProcessError as e:
+        raise ConversionFailedException('Calculating gain is failed.')
+
+
 MIME_TYPE_TO_GAIN_CALCULATION_FUNCTION = {
-    OGG_VORBIS_MIME_TYPE: calculate_ogg_vorbis_gain}
+    OGG_VORBIS_MIME_TYPE: calculate_ogg_vorbis_gain,
+    MP3_MIME_TYPE: calculate_mp3_gain,
+}
 
 
 def calculate_gain(all_source_files):
@@ -102,63 +115,63 @@ def calculate_gain(all_source_files):
         raise ConversionFailedException('The files are an unsupported format.')
 
 
-def copy_tags(ogg_file_path, mp3_file_path):
-    ogg_file = mutagen.File(ogg_file_path)
+def copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path):
+    file_type = mutagen.File(ogg_file_path)
     id3 = mutagen.id3.ID3()
 
     utf8 = mutagen.id3.Encoding.UTF8
     latin1 = mutagen.id3.Encoding.LATIN1
 
-    if 'title' in ogg_file:
-        id3.add(TIT2(encoding=utf8, text=ogg_file['title']))
-    if 'album' in ogg_file:
-        id3.add(TALB(encoding=utf8, text=ogg_file['album']))
+    if 'title' in file_type:
+        id3.add(TIT2(encoding=utf8, text=file_type['title']))
+    if 'album' in file_type:
+        id3.add(TALB(encoding=utf8, text=file_type['album']))
 
-    if 'artist' in ogg_file:
-        id3.add(TPE1(encoding=utf8, text=ogg_file['artist']))
-    if 'album artist' in ogg_file:
-        id3.add(TPE2(encoding=utf8, text=ogg_file['album artist']))
+    if 'artist' in file_type:
+        id3.add(TPE1(encoding=utf8, text=file_type['artist']))
+    if 'album artist' in file_type:
+        id3.add(TPE2(encoding=utf8, text=file_type['album artist']))
 
-    if 'genre' in ogg_file:
-        id3.add(TCON(encoding=utf8, text=ogg_file['genre']))
-    if 'date' in ogg_file:
-        id3.add(TDRC(encoding=latin1, text=ogg_file['date']))
+    if 'genre' in file_type:
+        id3.add(TCON(encoding=utf8, text=file_type['genre']))
+    if 'date' in file_type:
+        id3.add(TDRC(encoding=latin1, text=file_type['date']))
 
-    if 'tracknumber' in ogg_file:
-        id3.add(TRCK(encoding=latin1, text=ogg_file['tracknumber']))
-    if 'track' in ogg_file:
-        id3.add(TXXX(encoding=utf8, desc='TRACK', text=ogg_file['track']))
-    if 'tracknum' in ogg_file:
+    if 'tracknumber' in file_type:
+        id3.add(TRCK(encoding=latin1, text=file_type['tracknumber']))
+    if 'track' in file_type:
+        id3.add(TXXX(encoding=utf8, desc='TRACK', text=file_type['track']))
+    if 'tracknum' in file_type:
         id3.add(
-            TXXX(encoding=utf8, desc='TRACKNUM', text=ogg_file['tracknum']))
-    if 'tracktotal' in ogg_file:
+            TXXX(encoding=utf8, desc='TRACKNUM', text=file_type['tracknum']))
+    if 'tracktotal' in file_type:
         id3.add(
             TXXX(
-                encoding=utf8, desc='TRACKTOTAL', text=ogg_file['tracktotal']))
+                encoding=utf8, desc='TRACKTOTAL', text=file_type['tracktotal']))
 
-    if 'discnumber' in ogg_file:
-        id3.add(TPOS(encoding=latin1, text=ogg_file['discnumber']))
+    if 'discnumber' in file_type:
+        id3.add(TPOS(encoding=latin1, text=file_type['discnumber']))
 
-    if 'isrc' in ogg_file:
-        id3.add(TSRC(encoding=utf8, text=ogg_file['isrc']))
+    if 'isrc' in file_type:
+        id3.add(TSRC(encoding=utf8, text=file_type['isrc']))
 
-    if 'comment' in ogg_file:
-        id3.add(COMM(encoding=utf8, lang='eng', text=ogg_file['comment']))
-    elif 'description' in ogg_file:
-        id3.add(COMM(encoding=utf8, lang='eng', text=ogg_file['description']))
+    if 'comment' in file_type:
+        id3.add(COMM(encoding=utf8, lang='eng', text=file_type['comment']))
+    elif 'description' in file_type:
+        id3.add(COMM(encoding=utf8, lang='eng', text=file_type['description']))
 
-    if 'description' in ogg_file:
+    if 'description' in file_type:
         id3.add(
            TXXX(
                encoding=utf8,
                desc='DESCRIPTION',
-               text=ogg_file['description']))
-    if 'itunes_cddb_1' in ogg_file:
+               text=file_type['description']))
+    if 'itunes_cddb_1' in file_type:
         id3.add(
             TXXX(
                 encoding=utf8,
                 desc='ITUNES_CDDB_1',
-                text=ogg_file['itunes_cddb_1']))
+                text=file_type['itunes_cddb_1']))
 
     id3.save(mp3_file_path)
 
@@ -193,12 +206,28 @@ def convert_ogg_vorbis_to_mp3(ogg_file_path, mp3_file_path):
     finally:
         os.remove(wave_file_path)
 
-    copy_tags(ogg_file_path, mp3_file_path)
+    copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path)
 
 
-# TODO MP3
+def convert_mp3_to_mp3(mp3_source_file_path, mp3_destination_path):
+    lame = shutil.which('lame')
+    try:
+        subprocess.run(
+            [lame,
+             '-V5',
+             '--silent',
+             mp3_source_file_path,
+             mp3_destination_path],
+            check=True)
+    except subprocess.CalledProcessError:
+        raise ConversionFailedException(
+            'Conversion from wave to MP3 is failed.')
+
+
 MIME_TYPE_TO_CONVERSION_FUNCTION = {
-    OGG_VORBIS_MIME_TYPE: convert_ogg_vorbis_to_mp3}
+    OGG_VORBIS_MIME_TYPE: convert_ogg_vorbis_to_mp3,
+    MP3_MIME_TYPE: convert_mp3_to_mp3,
+}
 
 
 def convert_to_mp3(source_file_path, mp3_file_path):
@@ -250,6 +279,12 @@ def convert_for_itunes(all_source_files, output_directory):
                     e.cause)
 
 
+def filter_paths(all_paths):
+    return [path for path in all_paths
+            if os.path.splitext(path)[1].lower()
+            not in EXCLUDING_FILE_EXTENSIONS]
+
+
 def main():
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -268,9 +303,8 @@ def main():
 
     arguments = parser.parse_args()
 
-    source_files = arguments.source_files
-
-    if not exists_all_files(source_files):
+    source_files = filter_paths(arguments.source_files)
+    if len(source_files) == 0 or not exists_all_files(source_files):
         logging.error('The source files are not found.')
 
         sys.exit(1)
