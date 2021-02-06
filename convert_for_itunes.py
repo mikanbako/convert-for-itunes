@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Converts MP3 or Ogg Vorbis files in an album to MP3 files for iTunes.
+# Converts MP3, Flac or Ogg Vorbis files in an album to MP3 files for iTunes.
 
 from mutagen.id3 import (
     TIT2, TALB, TSRC, COMM, TCON, TDRC, TRCK, TPOS, TPE1, TPE2, TXXX)
@@ -19,9 +19,10 @@ import mutagen
 import mutagen.id3
 
 OGG_VORBIS_MIME_TYPE = 'audio/vorbis'
+FLAC_MIME_TYPE = 'audio/flac'
 MP3_MIME_TYPE = 'audio/mp3'
 
-SUPPORTED_MIME_TYPES = (OGG_VORBIS_MIME_TYPE, MP3_MIME_TYPE)
+SUPPORTED_MIME_TYPES = (OGG_VORBIS_MIME_TYPE, FLAC_MIME_TYPE, MP3_MIME_TYPE)
 
 EXCLUDING_FILE_EXTENSIONS = ('.log', '.pdf', '.txt', '.jpg', '.png')
 
@@ -91,6 +92,16 @@ def calculate_ogg_vorbis_gain(all_source_files):
         raise ConversionFailedException('Calculating gain is failed.')
 
 
+def calculate_flac_gain(all_source_files):
+    metaflac = shutil.which('metaflac')
+
+    try:
+        subprocess.run(
+            [metaflac, '--add-replay-gain'] + all_source_files, check=True)
+    except subprocess.CalledProcessError as e:
+        raise ConversionFailedException('Calculating gain is failed.')
+
+
 def calculate_mp3_gain(all_source_files):
     aacgain = shutil.which('aacgain')
 
@@ -102,6 +113,7 @@ def calculate_mp3_gain(all_source_files):
 
 MIME_TYPE_TO_GAIN_CALCULATION_FUNCTION = {
     OGG_VORBIS_MIME_TYPE: calculate_ogg_vorbis_gain,
+    FLAC_MIME_TYPE: calculate_flac_gain,
     MP3_MIME_TYPE: calculate_mp3_gain,
 }
 
@@ -115,8 +127,8 @@ def calculate_gain(all_source_files):
         raise ConversionFailedException('The files are an unsupported format.')
 
 
-def copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path):
-    file_type = mutagen.File(ogg_file_path)
+def copy_tags(source_file_path, mp3_file_path):
+    file_type = mutagen.File(source_file_path)
     id3 = mutagen.id3.ID3()
 
     utf8 = mutagen.id3.Encoding.UTF8
@@ -131,6 +143,8 @@ def copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path):
         id3.add(TPE1(encoding=utf8, text=file_type['artist']))
     if 'album artist' in file_type:
         id3.add(TPE2(encoding=utf8, text=file_type['album artist']))
+    if 'albumartist' in file_type:
+        id3.add(TPE2(encoding=utf8, text=file_type['albumartist']))
 
     if 'genre' in file_type:
         id3.add(TCON(encoding=utf8, text=file_type['genre']))
@@ -147,10 +161,18 @@ def copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path):
     if 'tracktotal' in file_type:
         id3.add(
             TXXX(
-                encoding=utf8, desc='TRACKTOTAL', text=file_type['tracktotal']))
+                encoding=utf8,
+                desc='TRACKTOTAL',
+                text=file_type['tracktotal']))
 
     if 'discnumber' in file_type:
         id3.add(TPOS(encoding=latin1, text=file_type['discnumber']))
+    if 'disctotal' in file_type:
+        id3.add(
+            TXXX(
+                encoding=utf8,
+                desc='DISCTOTAL',
+                text=file_type['disctotal']))
 
     if 'isrc' in file_type:
         id3.add(TSRC(encoding=utf8, text=file_type['isrc']))
@@ -176,6 +198,22 @@ def copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path):
     id3.save(mp3_file_path)
 
 
+def convert_wave_to_mp3(wave_file_path, mp3_file_path):
+    lame = shutil.which('lame')
+
+    try:
+        subprocess.run(
+            [lame,
+             '-V5',
+             '--silent',
+             wave_file_path,
+             mp3_file_path],
+            check=True)
+    except subprocess.CalledProcessError:
+        raise ConversionFailedException(
+            'Conversion from wave to MP3 is failed.')
+
+
 def convert_ogg_vorbis_to_mp3(ogg_file_path, mp3_file_path):
     wave_file = tempfile.NamedTemporaryFile()
     wave_file.close()
@@ -191,22 +229,41 @@ def convert_ogg_vorbis_to_mp3(ogg_file_path, mp3_file_path):
         raise ConversionFailedException(
             'Conversion from Ogg Vorbis to wave is failed.')
 
-    lame = shutil.which('lame')
     try:
-        subprocess.run(
-            [lame,
-             '-V5',
-             '--silent',
-             wave_file_path,
-             mp3_file_path],
-            check=True)
-    except subprocess.CalledProcessError:
-        raise ConversionFailedException(
-            'Conversion from wave to MP3 is failed.')
+        convert_wave_to_mp3(wave_file, mp3_file_path)
     finally:
         os.remove(wave_file_path)
 
-    copy_ogg_vorbis_tags(ogg_file_path, mp3_file_path)
+    copy_tags(ogg_file_path, mp3_file_path)
+
+
+def convert_flac_to_mp3(flac_file_path, mp3_file_path):
+    wave_file = tempfile.NamedTemporaryFile()
+    wave_file.close()
+    wave_file_path = wave_file.name
+
+    flac = shutil.which('flac')
+    try:
+        subprocess.run(
+            [flac,
+             '-s',
+             '-d',
+             '--apply-replaygain-which-is-not-lossless',
+             '-o',
+             wave_file_path,
+             flac_file_path],
+            check=True)
+    except subprocess.CalledProcessError:
+        os.remove(wave_file_path)
+        raise ConversionFailedException(
+            'Conversion from Flac to wave is failed.')
+
+    try:
+        convert_wave_to_mp3(wave_file_path, mp3_file_path)
+    finally:
+        os.remove(wave_file_path)
+
+    copy_tags(flac_file_path, mp3_file_path)
 
 
 def convert_mp3_to_mp3(mp3_source_file_path, mp3_destination_path):
@@ -226,6 +283,7 @@ def convert_mp3_to_mp3(mp3_source_file_path, mp3_destination_path):
 
 MIME_TYPE_TO_CONVERSION_FUNCTION = {
     OGG_VORBIS_MIME_TYPE: convert_ogg_vorbis_to_mp3,
+    FLAC_MIME_TYPE: convert_flac_to_mp3,
     MP3_MIME_TYPE: convert_mp3_to_mp3,
 }
 
@@ -290,12 +348,12 @@ def main():
 
     parser = argparse.ArgumentParser(
         description='''
-        Converts MP3 or Ogg Vorbis files in an album to MP3 files.''')
+        Converts MP3, Flac or Ogg Vorbis files in an album to MP3 files.''')
     parser.add_argument(
         'source_files',
         metavar='SOURCE',
         nargs='+',
-        help='Ogg Vorbis files or MP3 files in an album.')
+        help='MP3, Flac or Ogg Vorbis files in an album.')
     parser.add_argument(
         'output_directory',
         metavar='DIR',
