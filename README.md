@@ -2,7 +2,7 @@
 
 My scripts to convert from music files to MP3 files for iTunes.
 
-* convert_for_itunes.py: A script that converts Ogg Vorbis or MP3 files in an album to MP3 files for iTunes.
+* convert_for_itunes.py: A script that converts Ogg Vorbis, Frac or MP3 files in an album to MP3 files for iTunes.
 * move_music_files.py: A script to move Ogg Vorbis or MP3 files to a structured directory and rename its files by its album name, artist, title and others.
 
 ## Requirements
