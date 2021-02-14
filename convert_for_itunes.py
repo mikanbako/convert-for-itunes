@@ -230,7 +230,7 @@ def convert_ogg_vorbis_to_mp3(ogg_file_path, mp3_file_path):
             'Conversion from Ogg Vorbis to wave is failed.')
 
     try:
-        convert_wave_to_mp3(wave_file, mp3_file_path)
+        convert_wave_to_mp3(wave_file_path, mp3_file_path)
     finally:
         os.remove(wave_file_path)
 
