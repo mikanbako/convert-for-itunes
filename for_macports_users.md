@@ -21,3 +21,14 @@ When the errors are occured while building, edit mics.c.
 
 1. Add "#include <unistd.h>"
 2. Add "#include <sys/ioctl.h>"
+
+## [vorbis-tools](https://github.com/xiph/vorbis-tools)
+
+ogg123 is not installed on vorbis-tools @1.4.0_2 in the default.
+
+Use install action with source only mode. libao is also required to build ogg123:
+
+```shell
+sudo port install libao
+sudo port install -s vorbis-tools
+```
