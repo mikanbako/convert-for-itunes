@@ -1,0 +1,31 @@
+# GStreamer commands to create test files
+
+## Ogg Vorbis
+
+gst-launch-1.0 audiotestsrc num-buffers=100 samplesperbuffer=441 ! audioconvert ! vorbisenc ! oggmux ! filesink location=/data/test1.ogg
+
+gst-launch-1.0 audiotestsrc num-buffers=100 wave=1 samplesperbuffer=441 ! audioconvert ! vorbisenc ! oggmux ! filesink location=/data/test2.ogg
+
+## Flac
+
+./run_container_file.sh gst-launch-1.0 audiotestsrc num-buffers=100 samplesperbuffer=441 ! audioconvert ! flacenc ! filesink location=/data/test1.flac
+
+./run_container_file.sh gst-launch-1.0 audiotestsrc wave=1 num-buffers=100 samplesperbuffer=441 ! audioconvert ! flacenc ! filesink location=/data/test2.flac
+
+## MP3
+
+gst-launch-1.0 audiotestsrc num-buffers=100 samplesperbuffer=441 ! audioconvert ! lamemp3enc ! filesink location=/data/test1.mp3
+
+gst-launch-1.0 audiotestsrc wave=1 num-buffers=100 samplesperbuffer=441 ! audioconvert ! lamemp3enc ! filesink location=/data/test2.mp3
+
+## AAC
+
+gst-launch-1.0 audiotestsrc num-buffers=100 samplesperbuffer=441 ! audioconvert ! avenc_aac ! filesink location=/data/test1.m4a
+
+gst-launch-1.0 audiotestsrc wave=1 num-buffers=100 samplesperbuffer=441 ! audioconvert ! avenc_aac ! filesink location=/data/test2.m4a
+
+## WAV
+
+gst-launch-1.0 audiotestsrc num-buffers=100 samplesperbuffer=441 ! audioconvert ! wavenc ! audio/x-raw,format=S16LE ! filesink location=/data/test1.wav
+
+gst-launch-1.0 audiotestsrc wave=1 num-buffers=100 samplesperbuffer=441 ! audioconvert ! wavenc ! audio/x-raw,format=S16LE ! filesink location=/data/test2.wav
