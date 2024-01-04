@@ -1,9 +1,12 @@
+//! An element for WAV files.
+
 use std::path::{Path, PathBuf};
 
 use crate::conversion_error::ConversionError;
 
-use super::{common, flac, lame, Analyzer, Mp3Converter};
+use super::{common, flac, Analyzer};
 
+/// Whether a file is an WAV file.
 pub fn is_wav<P: AsRef<Path>>(file: P) -> bool {
     common::has_extension("wav", file)
 }
@@ -12,6 +15,11 @@ pub struct WavFlacAnalyzer {
     working_directory: PathBuf,
 }
 
+/// An [`Analyzer`] for WAV files by converted FLAC files.
+///
+/// This analyzer converts from WAV files to FLAC files to apply replaygain.
+///
+/// flac is used.
 impl WavFlacAnalyzer {
     pub fn new(working_directory: &Path) -> Self {
         WavFlacAnalyzer {
@@ -21,9 +29,9 @@ impl WavFlacAnalyzer {
 }
 
 impl Analyzer for WavFlacAnalyzer {
-    fn analyze<'a>(
+    fn analyze(
         &self,
-        source_paths_in_album: &[&'a Path],
+        source_paths_in_album: &[&Path],
     ) -> Result<Vec<std::path::PathBuf>, ConversionError> {
         let all_flac_files = source_paths_in_album
             .iter()
@@ -36,10 +44,7 @@ impl Analyzer for WavFlacAnalyzer {
                     path
                 };
 
-                match flac::convert_wav_to_flac(wav_path, &flac_path) {
-                    Ok(_) => Ok(flac_path),
-                    Err(error) => Err(error),
-                }
+                flac::convert_wav_to_flac(wav_path, &flac_path).map(|_| flac_path)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -52,17 +57,5 @@ impl Analyzer for WavFlacAnalyzer {
         )?;
 
         Ok(all_flac_files)
-    }
-}
-
-pub struct WavFlacToMp3Converter;
-
-impl Mp3Converter for WavFlacToMp3Converter {
-    fn convert(
-        &self,
-        source_file: &Path,
-        destination_file: &Path,
-    ) -> Result<(), crate::conversion_error::ConversionError> {
-        lame::convert_to_mp3(source_file, destination_file)
     }
 }

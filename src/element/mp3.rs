@@ -1,33 +1,22 @@
-use std::path::{Path, PathBuf};
+//! An element for MP3 files.
+
+use std::path::Path;
 
 use crate::conversion_error::ConversionError;
 
-use super::{aac::AacGain, common, lame, Analyzer, MetadataWriter, Mp3Converter};
+use super::{aac::AacGain, common, lame, MetadataWriter, Mp3Converter};
 
+/// Whether a file is an MP3 file.
 pub fn is_mp3<P: AsRef<Path>>(file: P) -> bool {
     common::has_extension("mp3", file)
 }
 
-pub struct Mp3Gain {
-    // aacgain can be used also for MP3 files.
-    aacgain: AacGain,
-}
+/// [`AacGain`] is used as analyzer because aacgain can treat MP3 files.
+pub type Mp3Gain = AacGain;
 
-impl Mp3Gain {
-    pub fn new() -> Self {
-        Mp3Gain { aacgain: AacGain }
-    }
-}
-
-impl Analyzer for Mp3Gain {
-    fn analyze<'a>(
-        &self,
-        source_paths_in_album: &[&'a Path],
-    ) -> Result<Vec<PathBuf>, crate::conversion_error::ConversionError> {
-        self.aacgain.analyze(source_paths_in_album)
-    }
-}
-
+/// Re-converts an MP3 file.
+///
+/// LAME is used.
 pub struct Mp3Reconverter;
 
 impl Mp3Converter for Mp3Reconverter {

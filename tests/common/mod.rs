@@ -16,24 +16,71 @@ fn get_test_file(filename: &str) -> PathBuf {
     path
 }
 
+/// Prepares test music files in the directory.
+///
+/// Files that specified `all_filenames` are copied to the directory.
+/// Paths of copied file are returned.
+///
+/// # Examples
+///
+/// ```
+/// let copied_files = prepare_test_files_in_directory(&["test1.mp3", "test1.ogg"]).unwrap();
+///
+/// assert!(copied_files[0].is_file());
+/// assert!(copied_files[1].is_file());
+/// ```
+pub fn prepare_test_files_in_directory<P: AsRef<Path>>(
+    all_filenames: &[&str],
+    directory: P,
+) -> Result<Vec<PathBuf>> {
+    let all_destination_files = all_filenames
+        .iter()
+        .map(|filename| {
+            let source_file = get_test_file(filename);
+            let destination_file = directory.as_ref().join(filename);
+
+            fs::copy(source_file, &destination_file)?;
+
+            Ok(destination_file)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(all_destination_files)
+}
+
+/// Prepares test music files.
+///
+/// Files that specified `all_filenames` are copied to the directory.
+/// Paths of copied file and the directory of them are returned.
+///
+/// # Examples
+///
+/// ```
+/// let (copied_files, directory) = prepare_test_files(&["test1.mp3", "test1.ogg"]).unwrap();
+///
+/// assert!(copied_files[0].is_file());
+/// assert!(copied_files[1].is_file());
+/// assert!(directory.path().is_dir());
+/// ```
 pub fn prepare_test_files(all_filenames: &[&str]) -> Result<(Vec<PathBuf>, TempDir)> {
     let directory = tempdir()?;
 
-    let source_and_destinations: Vec<_> = all_filenames
-        .iter()
-        .map(|filename| (get_test_file(filename), directory.path().join(filename)))
-        .collect();
-
-    let mut all_destination_files: Vec<PathBuf> = Vec::new();
-    for (source_file, destination_file) in source_and_destinations {
-        fs::copy(source_file, &destination_file)?;
-
-        all_destination_files.push(destination_file);
-    }
-
-    Ok((all_destination_files, directory))
+    prepare_test_files_in_directory(all_filenames, directory.path()).map(|files| (files, directory))
 }
 
+/// Prepares test a music file.
+///
+/// A file that specified `filename` are copied to the directory.
+/// The path of copied file and the directory of it are returned.
+///
+/// # Examples
+///
+/// ```
+/// let (copied_file, directory) = prepare_test_file("test1.mp3").unwrap();
+///
+/// assert!(copied_file.is_file());
+/// assert!(directory.path().is_dir());
+/// ```
 pub fn prepare_test_file(filename: &str) -> Result<(PathBuf, TempDir)> {
     let (mut destination_files, temporary_directory) = prepare_test_files(&[filename])?;
 
@@ -54,14 +101,22 @@ fn get_tag_items(file: &Path) -> Result<Vec<TagItem>, LoftyError> {
 fn is_mp3(path: &Path) -> Result<bool> {
     let probe = Probe::open(path)?.guess_file_type()?;
 
-    let is_mp3 = match probe.file_type() {
-        Some(file_type) => file_type == FileType::MPEG,
-        None => false,
-    };
+    let is_mp3 = probe
+        .file_type()
+        .map_or(false, |file_type| file_type == FileType::Mpeg);
 
     Ok(is_mp3)
 }
 
+/// Analyzes the single music file.
+///
+/// `filename` of the music file is analyzed.
+///
+/// # Examples
+///
+/// ```
+/// analyze_single("test1.ogg");
+/// ```
 #[allow(dead_code)]
 pub fn analyze_single(filename: &str) {
     let working_directory = tempdir().unwrap();
@@ -90,6 +145,15 @@ pub fn analyze_single(filename: &str) {
     .all(|key| after_tag_items.iter().any(|item| item.key() == key)));
 }
 
+/// Analyzes an album of music files.
+///
+/// `filenames` are analyzed as an album.
+///
+/// # Examples
+///
+/// ```
+/// analyze_album(&["test1.flac", "test1.ogg"]);
+/// ```
 #[allow(dead_code)]
 pub fn analyze_album(filenames: &[&str]) {
     let working_directory = tempdir().unwrap();
@@ -136,6 +200,15 @@ pub fn analyze_album(filenames: &[&str]) {
     assert_eq!(album_gains[0], album_gains[1]);
 }
 
+/// Converts a music file.
+///
+/// `test_filename` is converted.
+///
+/// # Examples
+///
+/// ```
+/// convert_source("test1.m4a");
+/// ```
 #[allow(dead_code)]
 pub fn convert_source(test_filename: &str) {
     let working_directory = tempdir().unwrap();
@@ -166,6 +239,10 @@ pub fn convert_source(test_filename: &str) {
     assert!(is_mp3(&destination_file).unwrap());
 }
 
+/// Asserts that two files have same metadata.
+///
+/// `source_file` is confersion of the source. `destination_directory` is conversion of
+/// the destination.
 pub fn assert_metadata(source_file: &Path, destination_file: &Path) {
     let source_tagged_file = lofty::read_from_path(source_file).unwrap();
     let source_tag = source_tagged_file.primary_tag().unwrap();
@@ -202,6 +279,9 @@ pub fn assert_metadata(source_file: &Path, destination_file: &Path) {
     assert!(!destination_tag.contains(&ItemKey::ReplayGainAlbumPeak));
 }
 
+/// Copies metadata from a music file.
+///
+/// `test_filename` of metadata is copied and asserted.
 #[allow(dead_code)]
 pub fn copy_metadata(test_filename: &str) {
     let (test_file, temporary_directory) = prepare_test_file(test_filename).unwrap();

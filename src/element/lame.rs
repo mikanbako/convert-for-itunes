@@ -1,9 +1,10 @@
+//! A module to use LAME.
+
 use std::path::Path;
 
 use crate::{conversion_error::ConversionError, element::common};
 
-// MP3 to MP3, WAV to MP3
-
+/// Converts an WAV file or an MP3 file to MP3 file.
 pub fn convert_to_mp3(source_file: &Path, destination_file: &Path) -> Result<(), ConversionError> {
     const COMMAND_NAME: &str = "lame";
 
@@ -14,5 +15,5 @@ pub fn convert_to_mp3(source_file: &Path, destination_file: &Path) -> Result<(),
         .arg(source_file)
         .arg(destination_file);
 
-    common::run_command(command, COMMAND_NAME)
+    common::run_command(command)
 }

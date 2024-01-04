@@ -2,6 +2,7 @@ use std::{path::PathBuf, process::ExitStatus};
 
 use thiserror::Error;
 
+/// Error about conversion.
 #[derive(Error, Debug)]
 pub enum ConversionError {
     #[error("Path ({path}) is invalid.")]
@@ -12,6 +13,15 @@ pub enum ConversionError {
 
     #[error("{path} is not a file.")]
     NotFile { path: PathBuf },
+
+    #[error("{source_file} is in the destination directory: {destination_directory}.")]
+    SourceFileInDestinationDirectory {
+        source_file: PathBuf,
+        destination_directory: PathBuf,
+    },
+
+    #[error("{filename} is duplicated.")]
+    DuplicatedFilename { filename: String },
 
     #[error("Not supported.")]
     NotSupported,

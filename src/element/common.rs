@@ -1,3 +1,5 @@
+//! Common functions for elements.
+
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -8,44 +10,50 @@ use which::which;
 
 use crate::{conversion_error::ConversionError, utilities};
 
+/// Gets a [`Command`] from a string that represents a command.
 pub fn get_command(command: &str) -> Result<Command, ConversionError> {
     let command_path = which(command);
 
-    match command_path {
-        Ok(command_path) => Ok(Command::new(command_path)),
-
-        Err(error) => Err(ConversionError::CommandNotFound {
+    command_path
+        .map(Command::new)
+        .map_err(|error| ConversionError::CommandNotFound {
             command: command.to_string(),
             error,
-        }),
-    }
+        })
 }
 
-pub fn run_command(command: &mut Command, command_name: &str) -> Result<(), ConversionError> {
+/// Runs a command.
+pub fn run_command(command: &mut Command) -> Result<(), ConversionError> {
     let result = command.status();
 
-    match result {
-        Ok(exit_status) => {
-            if exit_status.success() {
-                Ok(())
-            } else {
-                Err(ConversionError::CommandFailed {
-                    command: command_name.to_string(),
-                    status: exit_status,
-                })
-            }
-        }
-        Err(error) => Err(ConversionError::CommandCannotExecuted {
-            command: command_name.to_string(),
-            error,
-        }),
+    fn get_program(command: &Command) -> String {
+        command.get_program().to_string_lossy().to_string()
+    }
+
+    let exit_status = result.map_err(|error| ConversionError::CommandCannotExecuted {
+        command: get_program(command),
+        error,
+    })?;
+
+    if exit_status.success() {
+        Ok(())
+    } else {
+        Err(ConversionError::CommandFailed {
+            command: get_program(command),
+            status: exit_status,
+        })
     }
 }
 
+/// Creates a [`Vec`] of [`PathBuf`] from a slice of &[`Path`].
 pub fn create_path_bufs(paths: &[&Path]) -> Vec<PathBuf> {
     paths.iter().map(|path| path.to_path_buf()).collect()
 }
 
+/// Creates a temporary file for wav file to decode compressed music file.
+///
+/// This function returns the path of a temporary file and the directory that contains it
+/// to keep the directory.
 pub fn create_temporary_wav_file_path() -> Result<(PathBuf, TempDir), ConversionError> {
     let temporary_directory = utilities::create_temporary_directory()?;
 
@@ -60,18 +68,19 @@ pub fn create_temporary_wav_file_path() -> Result<(PathBuf, TempDir), Conversion
     Ok((wav_path, temporary_directory))
 }
 
+/// Whether a `file` has the `extension`.
 pub fn has_extension<P: AsRef<Path>>(extension: &str, file: P) -> bool {
-    match file.as_ref().extension() {
-        Some(file_extension) => file_extension.eq_ignore_ascii_case(extension),
-        None => false,
-    }
+    file.as_ref().extension().map_or(false, |file_extension| {
+        file_extension.eq_ignore_ascii_case(extension)
+    })
 }
 
-pub fn has_all_extension<'a, F>(paths: &[&'a Path], check: F) -> bool
+/// Whether all files have the extension that checks by `check` function.
+pub fn has_all_extension<'a, F>(files: &[&'a Path], check: F) -> bool
 where
     F: Fn(&'a Path) -> bool,
 {
-    paths.iter().all(|path| check(path))
+    files.iter().all(|path| check(path))
 }
 
 #[cfg(test)]

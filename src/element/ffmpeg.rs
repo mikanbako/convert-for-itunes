@@ -1,3 +1,5 @@
+//! A module for FFmpeg.
+
 use std::path::Path;
 
 use crate::{conversion_error::ConversionError, element::common};
@@ -6,6 +8,9 @@ use crate::{conversion_error::ConversionError, element::common};
 //
 // ffmpeg -i <input> -filter:a "volume=replaygain=album" <output>.wav
 
+/// Converts a source music file to an MP3 file.
+///
+/// `source_file` is converted to a `destination_file` as an MP3 file.
 pub fn convert_to_wav(source_file: &Path, destination_file: &Path) -> Result<(), ConversionError> {
     const COMMAND_NAME: &str = "ffmpeg";
 
@@ -19,5 +24,5 @@ pub fn convert_to_wav(source_file: &Path, destination_file: &Path) -> Result<(),
         .arg("volume=replaygain=album")
         .arg(destination_file);
 
-    common::run_command(command, COMMAND_NAME)
+    common::run_command(command)
 }

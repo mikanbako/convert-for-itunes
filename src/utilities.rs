@@ -1,39 +1,45 @@
-use std::path::{Path, PathBuf};
+//! Utility functions.
+
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use tempfile::{tempdir, TempDir};
 
 use crate::conversion_error::ConversionError;
 
+/// Converts a slice of [`PathBuf`] to a vector of &[`Path`].
 pub fn get_paths_from_path_bufs(path_bufs: &[PathBuf]) -> Vec<&Path> {
     path_bufs.iter().map(PathBuf::as_path).collect()
 }
 
+/// Creates a temporary directory.
 pub fn create_temporary_directory() -> Result<TempDir, ConversionError> {
-    match tempdir() {
-        Ok(directory) => Ok(directory),
-        Err(error) => Err(ConversionError::IoError { error }),
-    }
+    tempdir().map_err(|error| ConversionError::IoError { error })
 }
 
+/// Filters paths by extensions.
+///
+/// For example .log and .txt files are excluded.
 pub fn filter_paths<T: AsRef<Path>>(paths: &[T]) -> Vec<PathBuf> {
     const EXCLUDED_EXTENSIONS: &[&str] = &["log", "txt"];
+
+    fn is_included_extension(extension: &OsStr) -> bool {
+        !EXCLUDED_EXTENSIONS
+            .iter()
+            .any(|excluded_extension| *excluded_extension == extension.to_ascii_lowercase())
+    }
 
     paths
         .iter()
         .filter_map(|path| {
             let path = path.as_ref();
 
-            if let Some(extension) = path.extension() {
-                if let Some(extension) = extension.to_ascii_lowercase().to_str() {
-                    if !EXCLUDED_EXTENSIONS.contains(&extension) {
-                        return Some(path);
-                    }
-                }
-            }
-
-            None
+            path.extension()
+                .filter(|extension| is_included_extension(extension))
+                .map(|_| PathBuf::from(path))
         })
-        .map(PathBuf::from)
         .collect()
 }
 
