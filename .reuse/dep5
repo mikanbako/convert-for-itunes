@@ -1,0 +1,20 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Convert for iTunes
+Upstream-Contact: Keita Kita <maoutwo@gmail.com>
+Source: https://github.com/mikanbako/convert-for-itunes
+
+Files: .gitignore
+Copyright: 2024 Keita Kita <maoutwo@gmail.com>
+License: CC0-1.0
+
+Files: Cargo.*
+Copyright: 2024 Keita Kita <maoutwo@gmail.com>
+License: CC0-1.0
+
+Files: README.md
+Copyright: 2024 Keita Kita <maoutwo@gmail.com>
+License: CC-BY-4.0
+
+Files: tests/resources/*
+Copyright: 2024 Keita Kita <maoutwo@gmail.com>
+License: CC0-1.0

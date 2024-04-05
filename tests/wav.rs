@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Keita Kita <maoutwo@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
 use std::path::PathBuf;
 
 use convert_for_itunes::element::{ElementFactory, Elements};

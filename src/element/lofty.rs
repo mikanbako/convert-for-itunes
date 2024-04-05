@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Keita Kita <maoutwo@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
 //! A module that treats metadata of music files by [`lofty`].
 
 use std::path::Path;

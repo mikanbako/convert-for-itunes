@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Keita Kita <maoutwo@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
 mod common;
 
 use convert_for_itunes::metadata::{self, LoftyMetadataParser, MetadataParser};

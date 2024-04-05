@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 Keita Kita <maoutwo@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
 //! Converts musics files.
 
 use std::{
