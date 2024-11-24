@@ -11,7 +11,12 @@ use std::{
 };
 
 use anyhow::Result;
-use lofty::{id3::v2::Id3v2Tag, Accessor, ItemKey, Tag, TagExt, TaggedFile, TaggedFileExt};
+use lofty::{
+    config::WriteOptions,
+    file::{TaggedFile, TaggedFileExt},
+    id3::v2::Id3v2Tag,
+    tag::{Accessor, ItemKey, Tag, TagExt},
+};
 
 use crate::conversion_error::ConversionError;
 
@@ -160,7 +165,7 @@ pub fn copy_metadata(source_file: &Path, target_file: &Path) -> Result<(), Conve
     let id3v2_tag: Id3v2Tag = tag.into();
 
     id3v2_tag
-        .save_to_path(target_file)
+        .save_to_path(target_file, WriteOptions::default())
         .map_err(|error| ConversionError::CannotWriteMetadata {
             cause: error.to_string(),
         })

@@ -5,7 +5,7 @@
 mod common;
 
 use convert_for_itunes::metadata::{self, LoftyMetadataParser, MetadataParser};
-use lofty::{Accessor, TaggedFileExt};
+use lofty::{file::TaggedFileExt, tag::Accessor};
 
 #[test]
 fn copy_metadata() {

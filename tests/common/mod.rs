@@ -7,7 +7,10 @@ use std::{fs, path::Path};
 
 use anyhow::Result;
 use convert_for_itunes::element::{ElementFactory, Elements};
-use lofty::{Accessor, FileType, ItemKey, LoftyError, Probe, TagExt, TagItem, TaggedFileExt};
+use lofty::error::LoftyError;
+use lofty::file::{FileType, TaggedFileExt};
+use lofty::probe::Probe;
+use lofty::tag::{Accessor, ItemKey, TagExt, TagItem};
 use tempfile::{tempdir, TempDir};
 
 fn get_test_file(filename: &str) -> PathBuf {

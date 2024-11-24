@@ -14,7 +14,7 @@ use convert_for_itunes::{
     conversion_error::ConversionError,
     convert_for_itunes::{convert_for_itunes, ConvertForITunesError, OutputResult, Setting},
 };
-use lofty::{Accessor, TaggedFileExt};
+use lofty::{file::TaggedFileExt, tag::Accessor};
 use tempfile::{tempdir, TempDir};
 
 mod common;
@@ -123,7 +123,7 @@ fn get_output_result<'a>(
     results.iter().find(|result| &result.source == source_file)
 }
 
-fn read_primary_tag<P: AsRef<Path>>(music_file: P) -> lofty::Tag {
+fn read_primary_tag<P: AsRef<Path>>(music_file: P) -> lofty::tag::Tag {
     let tagged_file = lofty::read_from_path(music_file).unwrap();
 
     tagged_file.primary_tag().unwrap().to_owned()
@@ -145,8 +145,8 @@ fn assert_converted_result(source_filename: &str, input: &Input, results: &[Outp
 fn assert_replaygain_is_analyzed<P: AsRef<Path>>(music_file: P) {
     let tag = read_primary_tag(music_file);
 
-    assert!(tag.get(&lofty::ItemKey::ReplayGainTrackGain).is_some());
-    assert!(tag.get(&lofty::ItemKey::ReplayGainAlbumGain).is_some());
+    assert!(tag.get(&lofty::tag::ItemKey::ReplayGainTrackGain).is_some());
+    assert!(tag.get(&lofty::tag::ItemKey::ReplayGainAlbumGain).is_some());
 }
 
 #[test]

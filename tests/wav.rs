@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use convert_for_itunes::element::{ElementFactory, Elements};
-use lofty::TaggedFileExt;
+use lofty::file::TaggedFileExt;
 
 mod common;
 
