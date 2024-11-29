@@ -11,7 +11,12 @@ use std::{
 };
 
 use anyhow::Result;
-use lofty::{id3::v2::Id3v2Tag, Accessor, ItemKey, Tag, TagExt, TaggedFile, TaggedFileExt};
+use lofty::{
+    config::WriteOptions,
+    file::{TaggedFile, TaggedFileExt},
+    id3::v2::Id3v2Tag,
+    tag::{items::ENGLISH, Accessor, ItemKey, Tag, TagExt},
+};
 
 use crate::conversion_error::ConversionError;
 
@@ -110,7 +115,7 @@ fn read_tagged_file(source_file: &Path) -> Result<TaggedFile, ConversionError> {
     })
 }
 
-pub fn copy_metadata(source_file: &Path, target_file: &Path) -> Result<(), ConversionError> {
+fn convert_to_id3v2(mut tag: Tag) -> Id3v2Tag {
     fn get_no_number_string(key: &ItemKey, tag: &Tag) -> Option<String> {
         tag.get_string(key)
             .filter(|string| string.parse::<u32>().is_err())
@@ -123,13 +128,6 @@ pub fn copy_metadata(source_file: &Path, target_file: &Path) -> Result<(), Conve
         ItemKey::ReplayGainTrackGain,
         ItemKey::ReplayGainTrackPeak,
     ];
-
-    let source_tagged_file = read_tagged_file(source_file)?;
-    let Some(source_tag) = source_tagged_file.primary_tag() else {
-        return Ok(());
-    };
-
-    let mut tag = source_tag.to_owned();
 
     for key in EXCEPTED_TAG_ITEMS {
         tag.remove_key(key);
@@ -157,10 +155,26 @@ pub fn copy_metadata(source_file: &Path, target_file: &Path) -> Result<(), Conve
         }
     }
 
-    let id3v2_tag: Id3v2Tag = tag.into();
+    if let Some(mut comment) = tag.get(&ItemKey::Comment).cloned() {
+        // Music app (1.3.6.14) on macOS detects comment on MP3 with eng language only.
+        comment.set_lang(ENGLISH);
+
+        tag.insert(comment);
+    }
+
+    tag.into()
+}
+
+pub fn copy_metadata(source_file: &Path, target_file: &Path) -> Result<(), ConversionError> {
+    let source_tagged_file = read_tagged_file(source_file)?;
+    let Some(source_tag) = source_tagged_file.primary_tag() else {
+        return Ok(());
+    };
+
+    let id3v2_tag = convert_to_id3v2(source_tag.to_owned());
 
     id3v2_tag
-        .save_to_path(target_file)
+        .save_to_path(target_file, WriteOptions::default())
         .map_err(|error| ConversionError::CannotWriteMetadata {
             cause: error.to_string(),
         })

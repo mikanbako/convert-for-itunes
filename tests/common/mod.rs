@@ -2,12 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::{fs, path::Path};
 
 use anyhow::Result;
 use convert_for_itunes::element::{ElementFactory, Elements};
-use lofty::{Accessor, FileType, ItemKey, LoftyError, Probe, TagExt, TagItem, TaggedFileExt};
+use lofty::error::LoftyError;
+use lofty::file::{FileType, TaggedFileExt};
+use lofty::id3::v2::{Frame, FrameId, Id3v2Tag};
+use lofty::probe::Probe;
+use lofty::tag::items::ENGLISH;
+use lofty::tag::{Accessor, ItemKey, Tag, TagExt, TagItem};
 use tempfile::{tempdir, TempDir};
 
 fn get_test_file(filename: &str) -> PathBuf {
@@ -243,6 +249,19 @@ pub fn convert_source(test_filename: &str) {
     assert!(is_mp3(&destination_file).unwrap());
 }
 
+// Music app (1.3.6.14) on macOS detects comment on MP3 with eng language only.
+fn assert_mp3_comment_language(tag: &Tag) {
+    let id3v2_tag: Id3v2Tag = tag.clone().into();
+
+    const COMMENT_ID: FrameId<'_> = FrameId::Valid(Cow::Borrowed("COMM"));
+
+    let Frame::Comment(comm_frame) = id3v2_tag.get(&COMMENT_ID).unwrap() else {
+        panic!("COMM frame is not found.");
+    };
+
+    assert_eq!(ENGLISH, comm_frame.language);
+}
+
 /// Asserts that two files have same metadata.
 ///
 /// `source_file` is confersion of the source. `destination_directory` is conversion of
@@ -256,7 +275,10 @@ pub fn assert_metadata(source_file: &Path, destination_file: &Path) {
     assert_eq!(source_tag.title(), destination_tag.title());
     assert_eq!(source_tag.artist(), destination_tag.artist());
     assert_eq!(source_tag.album(), destination_tag.album());
+
     assert_eq!(source_tag.comment(), destination_tag.comment());
+    assert_mp3_comment_language(destination_tag);
+
     assert_eq!(source_tag.year(), destination_tag.year());
     assert_eq!(source_tag.track_total(), destination_tag.track_total());
     assert_eq!(source_tag.track(), destination_tag.track());
